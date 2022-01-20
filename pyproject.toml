@@ -1,0 +1,25 @@
+[build-system]
+# cf https://github.com/scikit-build/scikit-build-core
+requires = ["scikit-build-core", "pybind11"]
+build-backend = "scikit_build_core.build"
+
+[project]
+name = "bluegalaxyenergy"
+version = "1.0.1"
+description="A tool to perform the so-called BGE attack"
+readme = "README.md"
+requires-python = ">=3.7"
+license = {file = "LICENSE.txt"}
+authors = [
+  {name = "Laurent Grémy"},
+  {name = "Nicolas Surbayrole"},
+  {name = "Philippe Teuwen"},
+]
+
+[project.urls]
+repository = "https://github.com/SideChannelMarvels/BlueGalaxyEnergy"
+
+[tool.scikit-build]
+wheel.expand-macos-universal-tags = true
+ninja.make-fallback = true
+strict-config = true
