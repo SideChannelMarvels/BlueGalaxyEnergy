@@ -272,7 +272,7 @@ def extendKey(key, r):
     Key Schedule of AES
     :param key: AES key, as 16/24/32 bytes
     :param r: The number of rounds for AES (need r+1 roundKey)
-    :returns: A array of roundKey
+    :returns: An array of roundKey
     """
     keySize = len(key) // 4
     extKey = key

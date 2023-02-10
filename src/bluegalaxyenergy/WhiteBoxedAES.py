@@ -14,7 +14,7 @@
 # -----------------------------------------------------------------------------
 
 # This class is the interface with the whitebox
-# A child class must be implement for a whitebox with the same interface
+# A child class must be implemented for a whitebox with the same interface
 
 class WhiteBoxedAES:
 
