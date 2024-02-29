@@ -21,14 +21,14 @@
 #include <iostream>
 #include <memory>
 
-// This class is an encoding, ie a bijective function on integer in [0,256)
+// This class is an encoding, i.e. a bijective function on integer in [0,256)
 class BaseEncoding {
   protected:
     std::array<uint8_t, LEN_ARRAY> val = {};
     std::array<uint8_t, LEN_ARRAY> inv = {};
 
-    BaseEncoding(const std::array<uint8_t, LEN_ARRAY> &arr,
-                 const std::array<uint8_t, LEN_ARRAY> &invarr)
+    constexpr BaseEncoding(const std::array<uint8_t, LEN_ARRAY> &arr,
+                           const std::array<uint8_t, LEN_ARRAY> &invarr)
         : val(arr), inv(invarr) {}
 
     constexpr void computeInv() {
@@ -73,7 +73,7 @@ class BaseEncoding {
 
     // an encoding should always be valid.
     // The default constructor is the identity function
-    BaseEncoding() {
+    constexpr BaseEncoding() {
         for (unsigned int i = 0; i < LEN_ARRAY; i++) {
             val[i] = static_cast<uint8_t>(i);
             inv[i] = static_cast<uint8_t>(i);
@@ -88,21 +88,25 @@ class BaseEncoding {
         }
     }
 
-    uint8_t getVal(unsigned int i) const { return val[i]; }
-    uint8_t operator[](unsigned int i) const { return val[i]; }
+    constexpr uint8_t getVal(unsigned int i) const { return val[i]; }
+    constexpr uint8_t operator[](unsigned int i) const { return val[i]; }
 
-    uint8_t getInv(unsigned int i) const { return inv[i]; }
+    constexpr uint8_t getInv(unsigned int i) const { return inv[i]; }
 
     bool operator==(const BaseEncoding &other) const {
         return this->val == other.val;
     };
 
-    BaseEncoding inverse() const {
+    bool operator!=(const BaseEncoding &other) const {
+        return this->val != other.val;
+    };
+
+    constexpr BaseEncoding inverse() const {
         return BaseEncoding(inv, val);
     }
 
     // do this o other == this(other(...))
-    BaseEncoding compose(const BaseEncoding &other) const {
+    constexpr BaseEncoding compose(const BaseEncoding &other) const {
         std::array<uint8_t, LEN_ARRAY> n_val = {};
         std::array<uint8_t, LEN_ARRAY> n_inv = {};
         for (unsigned int i = 0; i < LEN_ARRAY; i++) {
@@ -116,6 +120,16 @@ class BaseEncoding {
         return val;
     }
 };
+
+MAYBE_UNUSED static std::ostream &operator<<(std::ostream &os,
+                                             const BaseEncoding &e) {
+    os << static_cast<unsigned int>(e[0]);
+    for (unsigned int r = 1; r < LEN_ARRAY; r++) {
+        os << ", " << static_cast<unsigned int>(e[r]);
+    }
+
+    return os;
+}
 
 #endif /* BASEENCODING_HPP */
 

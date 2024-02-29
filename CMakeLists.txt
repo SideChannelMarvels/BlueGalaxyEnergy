@@ -1,5 +1,7 @@
 cmake_minimum_required(VERSION 3.15)
 
+set(CMAKE_BUILD_TYPE Debug CACHE STRING "Used default build type" FORCE)
+
 project(${SKBUILD_PROJECT_NAME} VERSION ${SKBUILD_PROJECT_VERSION})
 
 set(CMAKE_CXX_FLAGS "-g -O3 -Wall -Wextra")

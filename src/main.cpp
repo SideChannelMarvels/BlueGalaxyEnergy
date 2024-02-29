@@ -19,6 +19,7 @@
 #include "computeQPtilde.hpp"
 #include <string>
 #include <map>
+#include <tuple>
 #include <utility>
 #include <iomanip>
 #include <pybind11/pybind11.h>
@@ -30,90 +31,106 @@
 namespace py = pybind11;
 using namespace pybind11::literals;
 
-std::array<std::array<unsigned int, 4>, 4> InvShiftRow = { {
-        {0, 1, 2, 3}, {3, 0, 1, 2}, {2, 3, 0, 1}, {1, 2, 3, 0}
-    }
-};
-
-std::array<std::array<unsigned int, 4>, 4> ShiftRow = { {
-        {0, 1, 2, 3}, {1, 2, 3, 0}, {2, 3, 0, 1}, {3, 0, 1, 2}
-    }
-};
-
-std::pair<std::map<uint8_t, std::array<uint8_t, 16>>, std::map<uint8_t, std::array<std::array<uint8_t, 256>, 16>>>
-recoverkey(const std::map < uint8_t, std::array < std::array < std::array<uint8_t, LEN_ARRAY>, LEN_ARRAY + 2 >, 16 >> & data) {
-    bool printEncoding = true;
+std::tuple<std::map<uint8_t, std::array<uint8_t, 16>>,
+           std::map<uint8_t, std::array<std::array<uint8_t, 256>, 16>>,
+           std::map<uint8_t, std::array<std::array<std::array<uint8_t, 4>, 4>, 4>>>
+recoverkey(const std::map < uint8_t, std::array < std::array < std::array<uint8_t, LEN_ARRAY>, LEN_ARRAY + 2 >, 16 >> & data,
+           bool isEncrypt) {
     InputReader inputReader {};
 
     inputReader.readData(data);
 
-    std::array<bool, AES_ROUND> isAvailable {};
+    std::array<bool, AES_ROUND> isQtildeAvailable {};
     std::array<std::array<std::array<ApproximateEncoding, 4>, 4>, AES_ROUND> Qtilde;
 
     // Compute the Qtilde if possible, that is Qtilde(x) = Q(A(x)), where A is an unknown affine encoding
     for (int round = 0; round < AES_ROUND; round++) {
         if (inputReader.isRoundAvailable(round)) {
-            isAvailable[round] = true;
+            isQtildeAvailable[round] = true;
             for (size_t col = 0; col < 4; col++) {
                 for (size_t row = 0; row < 4; row ++) {
                     if (not Qtilde[round][col][row].build(inputReader.getx0_all(round, col, row))) {
                         std::cerr << "Fail to build Qtilde for round " << round + 1 << " byte " << (col * 4 + row) << std::endl;
-                        isAvailable[round] = false;
+                        isQtildeAvailable[round] = false;
                     }
                 }
             }
         } else {
-            isAvailable[round] = false;
+            isQtildeAvailable[round] = false;
         }
     }
-
-    std::array < std::array<std::array<EncodingKey, 4>, 4>, AES_ROUND - 1 > Ptilde;
-    std::array < std::array<std::array<AffineEncoding, 4>, 4>, AES_ROUND - 1 > Q;
+    std::array < std::array<QPtildeLinear, 4>, AES_ROUND - 1 > QPtilde;
 
     for (int round = 0; round < AES_ROUND - 1; round++) {
-        if (not(isAvailable[round] and isAvailable[round + 1])) {
+        if (not(isQtildeAvailable[round] and isQtildeAvailable[round + 1])) {
             continue;
         }
         for (unsigned int col = 0; col < 4; col++) {
             std::array<std::array<BaseEncoding, 4>, 4> xy;
             for (unsigned int x = 0; x < 4; x++) {
+                unsigned int byteOffset = (isEncrypt) ? (ShiftRow[x][col]) : (InvShiftRow[x][col]);
                 for (unsigned int y = 0; y < 4; y++) {
                     xy[x][y] = Qtilde[round + 1][col][y].inverse().compose(
                                    inputReader.getx(x, round + 1, col, y).compose(
-                                       Qtilde[round][ShiftRow[x][col]][x]));
+                                       Qtilde[round][byteOffset][x]));
                 }
             }
-            if (not computeQPtilde(xy, Q[round][col], Ptilde[round][col])) {
+            if (not computeQPtilde(xy, QPtilde[round][col], isEncrypt)) {
                 std::cerr << "Fail to compute Q and Ptilde for round=" << round << ", col=" << col << std::endl;
-                isAvailable[round] = false;
                 break;
             }
         }
     }
 
+    // in case of encryption, QPtilde is already determined. But in case of decrypt,
+    // this isn't the case. We need to perform an additional collision between
+    // consecutive QPtilde
+    if (!isEncrypt) {
+        for (int round = 0; round < AES_ROUND - 2; round++) {
+            finalizeQPtildeDecrypt(QPtilde[round], QPtilde[round+1]);
+        }
+    }
+
+    std::array<bool, AES_ROUND - 1> isQPtildeAvailable {};
+
+    for (int round = 0; round < AES_ROUND - 1; round++) {
+        isQPtildeAvailable[round] =
+            QPtilde[round][0].isFinalize() &&
+            QPtilde[round][1].isFinalize() &&
+            QPtilde[round][2].isFinalize() &&
+            QPtilde[round][3].isFinalize();
+        if ((!isQPtildeAvailable[round]) &&
+            QPtilde[round][0].isValid() &&
+            QPtilde[round][1].isValid() &&
+            QPtilde[round][2].isValid() &&
+            QPtilde[round][3].isValid()) {
+
+            std::cerr << "Fail to finalize computation Q and Ptilde for round=" << round << std::endl;
+        }
+    }
+
+
     std::array < std::array<std::array<uint8_t, 4>, 4>, AES_ROUND - 2 > rkey;
-    std::array < std::array<std::array<BaseEncoding, 4>, 4>, AES_ROUND - 2 > internalEncoding;
     std::array<bool, AES_ROUND> keyAvailable {};
 
     for (int round = 0; round < AES_ROUND - 2; round++) {
-        if (not(isAvailable[round] and isAvailable[round + 1] and isAvailable[round + 2])) {
+        if (not(isQPtildeAvailable[round] and isQPtildeAvailable[round + 1])) {
             keyAvailable[round] = false;
             continue;
         }
         keyAvailable[round] = true;
         for (unsigned int col = 0; col < 4; col++) {
             for (unsigned int row = 0; row < 4; row++) {
-                BaseEncoding e = Ptilde[round + 1][InvShiftRow[row][col]][row].compose(Q[round][col][row]);
-                for (unsigned int x = 1; x < LEN_ARRAY; x++) {
-                    if (e[0] != (e[x] ^ x)) {
-                        std::cerr << "Fail to verify xor property for roundkey " << (round + 2) << " byte " << (col * 4 + row) << std::endl;
-                        keyAvailable[round] = false;
-                        break;
-                    }
+                unsigned int byteOffset = (isEncrypt) ? (InvShiftRow[row][col]) : (ShiftRow[row][col]);
+                if (!getAndVerifyKey(QPtilde[round][col].getQ(row),
+                                     QPtilde[round + 1][byteOffset].getPtilde(row),
+                                     rkey[round][col][row])) {
+                    std::cerr << "Fail to verify xor property for roundkey "
+                              << (round + 2) << " byte "
+                              << (col * 4 + row) << std::endl;
+                    keyAvailable[round] = false;
+                    break;
                 }
-                rkey[round][col][row] = e[0];
-                if (round != 0 && isAvailable[round - 1])
-                    internalEncoding[round][col][row] = Qtilde[round][col][row].compose(Q[round - 1][col][row]);
             }
         }
     }
@@ -137,26 +154,39 @@ recoverkey(const std::map < uint8_t, std::array < std::array < std::array<uint8_
 
     std::map<uint8_t, std::array<std::array<uint8_t, 256>, 16>> encodingMap;
 
-    if (printEncoding) {
-        for (int round = 0; round < AES_ROUND - 2; round++) {
-            if (round == 0 or not isAvailable[round - 1] or not keyAvailable[round]) {
-                continue;
+    for (int round = 1; round < AES_ROUND - 2; round++) {
+        if (not (isQtildeAvailable[round] and isQPtildeAvailable[round - 1])) {
+            continue;
+        }
+        std::array<std::array<uint8_t, 256>, 16> roundEncoding;
+        for (unsigned int col = 0; col < 4; col++) {
+            for (unsigned int row = 0; row < 4; row++) {
+                roundEncoding[col * 4 + row] = Qtilde[round][col][row].compose(
+                                               QPtilde[round - 1][col].getQ(row)).getEncodingArray();
             }
-            std::array<std::array<uint8_t, 256>, 16> roundEncoding;
-            for (unsigned int col = 0; col < 4; col++) {
-                for (unsigned int row = 0; row < 4; row++) {
-                    roundEncoding[col * 4 + row] = internalEncoding[round][col][row].getEncodingArray();
-                }
-            }
-            encodingMap[round + 1] = std::move(roundEncoding);
+        }
+        encodingMap[round + 1] = std::move(roundEncoding);
+    }
+    std::map <uint8_t, std::array<std::array<std::array<uint8_t, 4>, 4>, 4>> coeffMap;
+
+    for (int round = 0; round < AES_ROUND - 1; round++) {
+        if (isQPtildeAvailable[round]) {
+            coeffMap[round + 1] = {
+                QPtilde[round][0].getCoeff(),
+                QPtilde[round][1].getCoeff(),
+                QPtilde[round][2].getCoeff(),
+                QPtilde[round][3].getCoeff()
+            };
         }
     }
-    return std::make_pair(std::move(keyMap), std::move(encodingMap));
+
+
+    return std::make_tuple(std::move(keyMap), std::move(encodingMap), std::move(coeffMap));
 }
 
 PYBIND11_MODULE(_core, m) {
     m.doc() = "Blue Galaxy Energy module";
-    m.def("recoverkey", &recoverkey, "Core of the BGE key recovery", "filename"_a);
+    m.def("recoverkey", &recoverkey, "Core of the BGE key recovery", "data"_a, "isEncrypt"_a);
 
 #ifdef VERSION_INFO
     m.attr("__version__") = MACRO_STRINGIFY(VERSION_INFO);

@@ -23,7 +23,7 @@ class RelationEncoding {
     uint8_t c;
 
   public:
-    // Find a relation such that yi = yj * A + c
+    // Find a relationship such that yi = yj * A + c
     RelationEncoding(const BaseEncoding &yi, const BaseEncoding &yj) {
         c = yi[yj.getInv(0)];
         std::array<uint8_t, 8> row;

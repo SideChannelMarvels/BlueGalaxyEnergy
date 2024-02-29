@@ -20,7 +20,8 @@
 class EncodingKey : public BaseEncoding {
   public:
     EncodingKey() : BaseEncoding() {}
-    EncodingKey(const std::array<uint8_t, LEN_ARRAY> &arr) : BaseEncoding(arr) {}
+    explicit EncodingKey(const BaseEncoding &arr) : BaseEncoding(arr) {}
+    explicit EncodingKey(const std::array<uint8_t, LEN_ARRAY> &arr) : BaseEncoding(arr) {}
 };
 
 #endif /* ENCODINGKEY_HPP */

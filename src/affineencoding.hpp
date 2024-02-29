@@ -19,7 +19,28 @@
 class AffineEncoding : public BaseEncoding {
   public:
     AffineEncoding() : BaseEncoding() {}
-    AffineEncoding(const std::array<uint8_t, LEN_ARRAY> &arr) : BaseEncoding(arr) {}
+    explicit AffineEncoding(const BaseEncoding &arr) : BaseEncoding(arr) {}
+    explicit AffineEncoding(const std::array<uint8_t, LEN_ARRAY> &arr) : BaseEncoding(arr) {}
+
+    AffineEncoding(const BaseEncoding &arr, uint8_t q) : BaseEncoding() {
+        construct(arr.getEncodingArray(), q);
+    }
+
+    AffineEncoding(const std::array<uint8_t, LEN_ARRAY> &arr, uint8_t q) : BaseEncoding() {
+        construct(arr, q);
+    }
+
+  protected:
+    void construct(const std::array<uint8_t, LEN_ARRAY> &arr, uint8_t q) {
+        for (unsigned int i = 0; i < LEN_ARRAY; i++) {
+            val[i] = arr[i] ^ q;
+            inv[arr[i] ^ q] = i;
+        }
+        if (! isvalid()) {
+            std::cerr << "BaseEncoding::isvalid : False, abort!" << std::endl;
+            abort();
+        }
+    }
 };
 #endif /* AFFINEENCODING_HPP */
 

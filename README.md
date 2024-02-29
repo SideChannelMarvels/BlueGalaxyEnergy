@@ -46,6 +46,10 @@ class MyWhiteBoxedAES(WhiteBoxedAES):
     def __init__(self, ...):
         # TODO
 
+    def isEncrypt(self):
+        # return True if the whitebox is an encryption whitebox, False otherwise
+        return True
+
     def getRoundNumber(self):
         # return the number of rounds of the whitebox (10 for AES128,
         #   12 for AES192 and 14 for AES256)
@@ -70,20 +74,21 @@ if key is not None:
     print("key:", key.hex())
 ```
 
-By default, the method `run()` will extract all the rounds (except the last one who
-doesn't have a mixColumns). You can limit which round to use for the attack
-with the option `roundList` : `bge.run(roundList = [4,5,6,7,8])`. However, the
-attack needs three consecutive rounds in order to extract one round key.
-For AES128, a minimum of three consecutive rounds is needed to extract the key.
-For AES192 and AES256, the minimum is four consecutive rounds.
+By default, the method `run` extracts all rounds except for the last one, which
+lacks a MixColumns operation. You can restrict the rounds used for the attack
+using the `roundList` option: `run(roundList = [4, 5, 6, 7, 8])`.
+However, the attack requires a minimum of three consecutive rounds to extract a single round key.
 
-## Limitations
+- AES128 necessitates a minimum of three consecutive rounds for key extraction.
+- AES192 and AES256 require a minimum of four consecutive rounds.
 
-The implementation can be used on AES-whiteboxes which encrypt, not on those
-which decrypt.
+If the whitebox's intermediary state is shuffled, specify `shuffle=True` in the `run` method.
+When shuffled, the number of required rounds increases to four for AES128 and AES192, and five for AES256.
+Insufficient rounds will result in no key being found or a dictionary containing 16 possible keys.
 
-The implementation does not cover the randomization in the order of the bytes
-of the intermediate results in AES, mentioned in De Mulder paper.
+The bge class can additionally extract the encoding of the intermediary round (with `bge.getEncoding()`)
+and the permutation of the intermediary round if the whitebox is shuffled (with `bge.getShuffle()`).
+For more information on these elements, refer to the test implemented in [`__main__.py`](src/bluegalaxyenergy/__main__.py).
 
 ## About
 
@@ -95,7 +100,7 @@ Initial Authors and Contributors:
 - Nicolas Surbayrole
 - Philippe Teuwen
 
-For next contributions, see the git projet history.
+For subsequent contributions, see the git projet history.
 
 ### Copyright
 

@@ -187,7 +187,7 @@ class Matrix {
 
     Matrix(const NTL::mat_GF2 &m) { from_mat_GF2(m); };
 
-    Matrix(const uint8_t &alpha) { generate_multiplication_matrix(alpha); };
+    Matrix(uint8_t alpha) { generate_multiplication_matrix(alpha); };
 
     void build(const std::array<uint8_t, SIZE_MATRIX> row) {
         uint8_t tmp;

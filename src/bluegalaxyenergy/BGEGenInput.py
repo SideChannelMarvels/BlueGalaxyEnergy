@@ -14,6 +14,7 @@
 # -----------------------------------------------------------------------------
 
 import multiprocessing as mp
+from .ByteOrder import verifyRoundsPermutation
 import os
 
 
@@ -34,7 +35,7 @@ def encodeResult(x0, x2, x3):
     return [
             [[o[b] for o in x0[y]] for y in range(256)] +
             [[o[b] for o in x2], [o[b] for o in x3]]
-        for b in range(16)]
+            for b in range(16)]
 
 
 def genBGEInputRound(wb, roundN):
@@ -76,15 +77,25 @@ def genBGEInputRound(wb, roundN):
     return {(roundN+1): encodeResult(x0, x2, x3)}
 
 
+def init_localWB(wb):
+    global localWB
+    wb.newThread()
+    localWB = wb
+
+
+def genBGEInputRoundProxy(roundN):
+    global localWB
+    return genBGEInputRound(localWB, roundN)
+
+
 # [param] wb            instance of WhiteBoxedAES
 # [param] roundList     list of rounds in [0, wb.getRoundNumber() - 1)
 # [param] nmultiProcess nprocess in the poll (0 to not use multiprocessing)
-def genBGEInput(wb, roundList=None, nmultiProcess=None):
-    if roundList is None:
-        roundList = list(range(wb.getRoundNumber() - 1))
-
+def genBGEInput(wb, roundList, nmultiProcess=None):
     if nmultiProcess is None:
         nmultiProcess = detectCPU()
+
+    assert verifyRoundsPermutation(wb, roundList), "Detected impact on the wrong column, use 'BGE(..., shuffle=True)'"
 
     result = {}
 
@@ -93,10 +104,10 @@ def genBGEInput(wb, roundList=None, nmultiProcess=None):
             result.update(genBGEInputRound(wb, rnd))
     else:
         assert nmultiProcess >= 1
-        with mp.Pool(processes=nmultiProcess) as pool:
+        with mp.Pool(processes=nmultiProcess, initializer=init_localWB, initargs=(wb, )) as pool:
             res = []
             for rnd in roundList:
-                res.append(pool.apply_async(genBGEInputRound, (wb, rnd)))
+                res.append(pool.apply_async(genBGEInputRoundProxy, (rnd, )))
             for r in res:
                 result.update(r.get())
     return result

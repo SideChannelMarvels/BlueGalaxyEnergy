@@ -16,16 +16,32 @@
 # This class is the interface with the whitebox
 # A child class must be implemented for a whitebox with the same interface
 
-class WhiteBoxedAES:
+import abc
 
+
+class WhiteBoxedAES(abc.ABC):
+
+    @abc.abstractmethod
+    def isEncrypt(self):
+        # return True if the whitebox is an encryption whitebox, False otherwise
+        pass
+
+    @abc.abstractmethod
     def getRoundNumber(self):
         # return the number of rounds of the whitebox (10 for AES128,
         #   12 for AES192 and 14 for AES256)
-        raise NotImplementedError("WhiteBoxedAES.getRoundNumber must be implemented for a given whitebox")
+        pass
 
+    @abc.abstractmethod
     def applyRound(self, data, roundN):
-        # Apply a round of the whitebox on a buffer
+        # Apply a round of the whitebox on a buffer. In case of decrypting
+        # whitebox, the round 0 refers to the first round of decryption.
         # [param] data    a buffer of 16 bytes (type bytes)
         # [param] roundN  the round number to apply (int in the range [0, self.getRoundNumber()) )
         # return  16 bytes of the encrypted data by the round
-        raise NotImplementedError("WhiteBoxedAES.applyRound must be implemented for a given whitebox")
+        pass
+
+    def newThread(self):
+        # When BGE is used with multiprocess, this method is call once at the
+        # beginning of each new thread
+        pass

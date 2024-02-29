@@ -71,6 +71,16 @@ class Encoding8:
     def __eq__(self, other):
         return all([x == y for x, y in zip(self.encoded, other.getEncodeTable())])
 
+    def __repr__(self):
+        return "Encoding (" + ", ".join([f"0x{x:02x}" for x in self.getEncodeTable()]) + ")"
+
+
+class Encoding8Xor(Encoding8):
+
+    def __init__(self, value):
+        tab = [x ^ value for x in range(256)]
+        super().__init__(tab)
+
 
 class Encoding8Random(Encoding8):
 
@@ -79,9 +89,9 @@ class Encoding8Random(Encoding8):
             state = random.getstate()
             random.seed(seed)
 
-        self.encoded = list(range(256))
-        random.shuffle(self.encoded)
-        self._genInverse()
+        tab = list(range(256))
+        random.shuffle(tab)
+        super().__init__(tab)
 
         if seed is not None:
             random.setstate(state)
@@ -90,8 +100,7 @@ class Encoding8Random(Encoding8):
 class Encoding8Identity(Encoding8):
 
     def __init__(self):
-        self.encoded = list(range(256))
-        self.plain = list(range(256))
+        super().__init__(list(range(256)))
 
 
 class Encoding:
@@ -135,6 +144,13 @@ class Encoding:
         return all([x == y for x, y in zip(self.encodingList, other.encodingList)])
 
 
+class EncodingXor(Encoding):
+
+    def __init__(self, value):
+        tab = [Encoding8Xor(x) for x in value]
+        super().__init__(tab)
+
+
 class EncodeType(Enum):
     RANDOM = auto()
     IDENTITY = auto()
@@ -148,27 +164,25 @@ class EncodingGenerator(Encoding):
     }
 
     def __init__(self, length, encodeType, seed=None):
-        self.length = length
         self.encodeType = encodeType
         self.seed = seed
-
-        self.regenerate()
+        super().__init__(self.regenerate(length))
 
     def setType(self, encodeType):
         if self.encodeType != encodeType:
             self.encodeType = encodeType
-            self.regenerate()
+            self.encodingList = self.regenerate(self.length)
 
-    def regenerate(self):
+    def regenerate(self, length):
         c = self.encClass[self.encodeType]
         if self.seed is None or self.encodeType == EncodeType.IDENTITY:
-            self.encodingList = [c() for _ in range(self.length)]
-        elif type(self.seed) == int:
-            self.encodingList = [c(self.seed+i) for i in range(self.length)]
-        elif type(self.seed) == bytes:
-            self.encodingList = [c(self.seed+bytes(i)) for i in range(self.length)]
+            return [c() for _ in range(length)]
+        elif isinstance(self.seed, int):
+            return [c(self.seed+i) for i in range(length)]
+        elif isinstance(self.seed, bytes):
+            return [c(self.seed+bytes(i)) for i in range(length)]
         else:
-            self.encodingList = [c(self.seed) for _ in range(self.length)]
+            return [c(self.seed) for _ in range(length)]
 
 
 def test():

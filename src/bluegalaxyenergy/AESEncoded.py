@@ -13,7 +13,7 @@
 # See LICENSE.txt for the text of the Apache license.
 # -----------------------------------------------------------------------------
 
-from .AES import AES
+from .AES import AES, RoundType
 from .Encoding import EncodeType, EncodingGenerator
 import random
 
@@ -23,23 +23,24 @@ class AESEncoded(AES):
     AES_KEY_ROUND = {16: 10, 24: 12, 32: 14}
 
     def __init__(self, key, encodingType=EncodeType.RANDOM, encodingSeed=None,
-                 byteswap=False):
-        super().__init__(key, self.AES_KEY_ROUND[len(key)])
+                 byteSwap=False, roundType=RoundType.RoundEncType0):
+
+        super().__init__(key, self.AES_KEY_ROUND[len(key)], roundType=roundType)
 
         if encodingSeed is None:
             self.encoding = [EncodingGenerator(16, encodingType)
                              for _ in range(self.AES_KEY_ROUND[len(key)] + 1)]
-        elif type(encodingSeed) == int:
+        elif isinstance(encodingSeed, int):
             self.encoding = [EncodingGenerator(16, encodingType, seed=encodingSeed+i*16)
                              for i in range(self.AES_KEY_ROUND[len(key)] + 1)]
-        elif type(encodingSeed) == bytes:
+        elif isinstance(encodingSeed, bytes):
             self.encoding = [EncodingGenerator(16, encodingType, seed=encodingSeed+bytes([i]))
                              for i in range(self.AES_KEY_ROUND[len(key)] + 1)]
         else:
             self.encoding = [EncodingGenerator(16, encodingType, seed=encodingSeed)
                              for i in range(self.AES_KEY_ROUND[len(key)] + 1)]
 
-        if not byteswap:
+        if not byteSwap:
             self.roundPerm = [list(range(16)) for _ in range(self.r)]
         elif encodingSeed is None:
             self.roundPerm = [random.sample(list(range(16)), 16) for _ in range(self.r)]
@@ -51,14 +52,20 @@ class AESEncoded(AES):
 
         self.reverseRoundPerm = [[p.index(i) for i in range(16)] for p in self.roundPerm]
 
+    def applyPermutation(self, data, roundN):
+        return bytes([data[x] for x in self.roundPerm[roundN]])
+
+    def applyReversePermutation(self, data, roundN):
+        return bytes([data[x] for x in self.reverseRoundPerm[roundN]])
+
     def encrypt_round_encode(self, state, roundN):
         if roundN != 0:
-            state = [state[x] for x in self.reverseRoundPerm[roundN-1]]
+            state = self.applyReversePermutation(state, roundN-1)
         state = self.encoding[roundN].decode(state)
         state = self.encrypt_round(state, roundN)
         state = self.encoding[roundN + 1].encode(state)
         if roundN + 1 != self.r:
-            state = [state[x] for x in self.roundPerm[roundN]]
+            state = self.applyPermutation(state, roundN)
         return state
 
     def encrypt_encode(self, state):
@@ -83,12 +90,12 @@ class AESEncoded(AES):
 
     def decrypt_round_encode(self, state, roundN):
         if roundN + 1 != self.r:
-            state = [state[x] for x in self.roundPerm[roundN]]
+            state = self.applyReversePermutation(state, roundN)
         state = self.encoding[roundN + 1].decode(state)
         state = self.decrypt_round(state, roundN)
         state = self.encoding[roundN].encode(state)
         if roundN != 0:
-            state = [state[x] for x in self.reverseRoundPerm[roundN-1]]
+            state = self.applyPermutation(state, roundN-1)
         return state
 
     def decrypt_encode(self, state):
@@ -146,13 +153,17 @@ def test():
         assert c.decrypt_encode(bytes.fromhex(cipher)) == bytes.fromhex(plain)
 
         for _ in range(16):
-            c = AESEncoded(bytes.fromhex(key))
+            c = AESEncoded(bytes.fromhex(key), byteSwap=True)
             data = random.randbytes(16)
             assert c.encrypt_encode(c.decrypt_encode(data)) == data
             assert c.decrypt_encode(c.encrypt_encode(data)) == data
 
             assert c.encrypt_encode(data) == c.encrypt_encode_fast(data)
             assert c.decrypt_encode(data) == c.decrypt_encode_fast(data)
+
+            for roundN in range(c.r):
+                assert c.encrypt_round_encode(c.decrypt_round_encode(data, roundN), roundN) == data
+                assert c.decrypt_round_encode(c.encrypt_round_encode(data, roundN), roundN) == data
 
 
 if __name__ == "__main__":
