@@ -95,7 +95,7 @@ def genBGEInput(wb, roundList, nmultiProcess=None):
     if nmultiProcess is None:
         nmultiProcess = detectCPU()
 
-    assert verifyRoundsPermutation(wb, roundList), "Detected impact on the wrong column, use 'BGE(..., shuffle=True)'"
+    assert verifyRoundsPermutation(wb, roundList), "Detected impact on the wrong column, use 'run(..., shuffle=True)'"
 
     result = {}
 

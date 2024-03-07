@@ -237,15 +237,15 @@ class BGE:
                 res[self.numRound-(2+r)] = self.shuffleProxy.reverseRoundPerm[r]
         return res
 
-    def computeKey(self, keyLen=None, transposed_rk=False, offset=0):
+    def computeKey(self, keyLen=None, offset=0):
         assert self.state == BGEState.ResolveDone
         if not self.shuffle:
-            return self._computeKey(keyLen=keyLen, transposed_rk=transposed_rk, offset=offset)
+            return self._computeKey(keyLen=keyLen, offset=offset)
         else:
             possibleKey = {}
             for i in range(16):
                 self._changeWbProxyFirstByte(i)
-                key = self._computeKey(keyLen=keyLen, transposed_rk=transposed_rk, offset=offset)
+                key = self._computeKey(keyLen=keyLen, offset=offset)
                 if key is not None:
                     possibleKey[i] = key
             if len(possibleKey.keys()) == 0:
@@ -256,7 +256,7 @@ class BGE:
                 return possibleKey[targetByte]
             return possibleKey
 
-    def _computeKey(self, keyLen=None, transposed_rk=False, offset=0):
+    def _computeKey(self, keyLen=None, offset=0):
         assert self.state == BGEState.ResolveDone
         assert self.numRound is not None
         if keyLen is None:
@@ -272,14 +272,10 @@ class BGE:
             j = i
             k = b''
             while len(k) < keyLen and j < len(localRoundKey) and localRoundKey[j] is not None:
-                if transposed_rk:
-                    tmpk = bytes(localRoundKey[j][x] for x in [0, 4, 8, 12, 1, 5, 9, 13, 2, 6, 10, 14, 3, 7, 11, 15])
-                else:
-                    tmpk = localRoundKey[j]
                 if self.isEncrypt:
-                    k += tmpk
+                    k += localRoundKey[j]
                 else:
-                    k += MC(tmpk)
+                    k += MC(localRoundKey[j])
                 j += 1
             if len(k) < keyLen:
                 continue
