@@ -19,9 +19,14 @@ To compile and install the project, install gmp and ntl libraries and developmen
 ```bash
 $ sudo apt install libgmp-dev libntl-dev
 ```
-or
+or on Arch
 ```bash
 $ sudo pacman -S gmp ntl
+```
+or on macOS
+```bash
+$ brew install gmp ntl
+$ export CPATH=/opt/homebrew/opt/gmp/include:/opt/homebrew/opt/ntl/include
 ```
 
 then compile and install the package locally:
