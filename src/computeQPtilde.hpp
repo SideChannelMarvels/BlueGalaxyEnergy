@@ -36,6 +36,7 @@ static unsigned int get_beta_req(const BaseEncoding &y0x0, const BaseEncoding &y
     NTL::mat_GF2 L0 = l0.getA().to_mat_GF2();
     NTL::mat_GF2 L1 = l1.getA().to_mat_GF2();
     L.SetDims(SIZE_MATRIX, SIZE_MATRIX);
+    if (NTL::IsZero(NTL::determinant(L1))) return 0;
     NTL::inv(L1, L1);
     mul(L, L1, L0);
 
