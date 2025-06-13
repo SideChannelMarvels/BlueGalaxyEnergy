@@ -75,7 +75,20 @@ bge.run()
 
 # extract the key from the available roundKey
 key = bge.computeKey()
-if key is not None:
+#if key is None:
+#    # Note, depending of your implementation of the whitebox,
+#    # the applyRound may not have the same numbering as the keyschedule
+#    # (ie, we expect to have a MixColumn during the round 0).
+#    # In this case, you can try to shift the key schedule to verify if a key can
+#    # be found
+#    key = bge.computeKey(offset=1)
+
+if key is None:
+    print("Key not found")
+elif type(key) is dict:
+    for k, v in key.items():
+        print(f"key {k}: {v.hex()}")
+else:
     print("key:", key.hex())
 ```
 
