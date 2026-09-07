@@ -14,6 +14,10 @@ find_library(NTL_LIB ntl REQUIRED)
 
 pybind11_add_module(_core MODULE src/main.cpp)
 
+if(CMAKE_CXX_COMPILER_ID MATCHES "Clang")
+  target_compile_options(_core PRIVATE -fconstexpr-steps=16777216)
+endif()
+
 target_compile_definitions(_core PRIVATE VERSION_INFO=${PROJECT_VERSION})
 target_link_libraries(_core PRIVATE ${NTL_LIB} ${GMP_LIB} ${PTHREAD_LIB})
 
